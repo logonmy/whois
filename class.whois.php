@@ -12,6 +12,21 @@ class Whois
         }
     }
 
+    public static function root($domain)
+    {
+        $d = explode(".", $domain);
+        $sld = implode(".", array_slice($d, -2, 2));
+        $ccsld_array = file("includes/ccsld.txt", FILE_IGNORE_NEW_LINES);
+
+        // first search for a matching country-coded SLD
+        // if no match, then assume a generic TLD
+        if (in_array($sld, $ccsld_array)) {
+            return implode(".", array_slice($d, -3, 3));
+        } else {
+            return implode(".", array_slice($d, -2, 2));
+        }
+    }
+
     private static function searchDomain($domain)
     {
         $d = explode(".", $domain);
