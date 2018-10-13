@@ -9,10 +9,17 @@ namespace michaelmawhinney;
  * @author Michael R Mawhinney JR <michael.mawhinney.jr@gmail.com>
  * @copyright 2018
  * @license https://opensource.org/licenses/MIT/ MIT
- * @version 0.8.0
+ * @version 0.9.0
  */
 class Whois
 {
+    /**
+     * Perform a WHOIS search for a domain name or IP address.
+     *
+     * @param string $keyword The search term.
+     *
+     * @return string|false
+     */
     public static function search($keyword)
     {
         if (filter_var($keyword, FILTER_VALIDATE_IP) !== false) {
@@ -20,16 +27,31 @@ class Whois
         } else if (filter_var($keyword, FILTER_VALIDATE_DOMAIN) !== false) {
             return self::searchDomain($keyword);
         } else {
-            die("Error: invalid WHOIS search keyword");
+            throw new Exception("Error: invalid WHOIS search keyword");
+            return false;
         }
     }
 
+    /**
+     * Get the root domain of a given domain name.
+     *
+     * @param string $domain The domain name to parse.
+     *
+     * @return string
+     */
     public static function root($domain)
     {
         $result = self::etld($domain);
         return $result["root"];
     }
 
+    /**
+     * Get the root domain, eTLD, and TLD of a given domain name.
+     *
+     * @param string $domain The domain name to parse.
+     *
+     * @return array
+     */
     private static function etld($domain)
     {
         $d = explode(".", $domain);
@@ -41,17 +63,24 @@ class Whois
             return array(
                 "root" => implode(".", array_slice($d, -3, 3)),
                 "etld" => implode(".", array_slice($d, -2, 2)),
-                "tld" => end($d)
+                "tld" => end($d),
             );
         } else {
             return array(
                 "root" => implode(".", array_slice($d, -2, 2)),
                 "etld" => end($d),
-                "tld" => end($d)
+                "tld" => end($d),
             );
         }
     }
 
+    /**
+     * Query the appropriate WHOIS server with a given domain.
+     *
+     * @param string $domain The domain name to search.
+     *
+     * @return string|false
+     */
     private static function searchDomain($domain)
     {
         $result = self::etld($domain);
@@ -64,32 +93,43 @@ class Whois
         } else if (array_key_exists($tld, self::WHOIS_SERVERS)) {
             $whois_server = self::WHOIS_SERVERS[$tld];
         } else {
-            die("Error: no WHOIS server found");
+            throw new Exception("Error: no WHOIS server found");
+            return false;
         }
 
         $result = self::query($whois_server, $root);
+
         if ($result === false) {
-            die("Error: no entry for $root on $whois_server");
+            throw new Exception("Error: no entry for $root on $whois_server");
         }
 
         return $result;
     }
 
+    /**
+     * Query the appropriate RIR with a given IP address.
+     *
+     * whois.arin.net (US, Canada)
+     * whois.ripe.net (Europe, Russia, Central Asia)
+     * whois.apnic.net (East Asia, Australia)
+     * whois.lacnic.net (Latin America -- but searches globally)
+     * whois.afrinic.net (Africa)
+     * whois.iana.org (fallback)
+     *
+     * @param string $ip The IP address to search.
+     *
+     * @return string|false
+     */
     private static function searchIp($ip)
     {
-        /*
-            whois.arin.net (US, Canada)
-            whois.ripe.net (Europe, Russia, Central Asia)
-            whois.apnic.net (East Asia, Australia)
-            whois.lacnic.net (Latin America -- but searches globally)
-            whois.afrinic.net (Africa)
-            whois.iana.org (fallback)
-        */
-
+        // first we set a default registry to fallback to
         $registry = "whois.iana.org";
+
+        // check for an IPv4 or IPv6
         if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
             $arr = explode(".", $ip);
             $octet = str_pad($arr[0], 3, "0", STR_PAD_LEFT);
+
             if (array_key_exists($octet, self::IPV4_REGISTRIES)) {
                 if (self::IPV4_REGISTRIES[$octet] != "reserved") {
                     $registry = self::IPV4_REGISTRIES[$octet];
@@ -98,7 +138,6 @@ class Whois
         } else if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
             $arr = explode(":", $ip);
             $sextet1 = str_pad($arr[0], 4, "0", STR_PAD_LEFT);
-
             $a = array_filter(
 				self::IPV6_REGISTRIES,
 				function($k) use ($sextet1) {
@@ -106,9 +145,9 @@ class Whois
 				},
 				ARRAY_FILTER_USE_KEY
 			);
-
             $match_value = end($a);
             $match_key = key($a);
+
             if ($match_key == "2001") {
                 $sextet2 = str_pad($arr[1], 4, "0", STR_PAD_LEFT);
                 $b = array_filter(
@@ -124,6 +163,7 @@ class Whois
             }
         } else {
             throw new Exception("Invalid IP address");
+            return false;
         }
 
         if ($registry == "reserved") {
@@ -131,26 +171,52 @@ class Whois
         }
 
         $result = self::query($registry, $ip);
+
         if ($result === false) {
             throw new Exception("Error: no entry found for $ip");
-        } else {
-            return $result;
         }
+
+        return $result;
     }
 
+    /**
+     * Query a given server with a given search term using WHOIS protocol.
+     *
+     * @param string $server  The server to query against.
+     * @param string $keyword The search term.
+     *
+     * @return string|false
+     */
     private static function query($server, $keyword)
     {
+        // open a connection on port 43 for WHOIS protocol
         $handle = fsockopen($server, 43, $errno, $errstr, 10);
+
         if ($handle === false) {
-            die("Socket Error $errno: $errstr");
-        } else {
-            fwrite($handle, $keyword . "\r\n");
-            $contents = stream_get_contents($handle);
-            fclose($handle);
-            return $contents;
+            throw new Exception("Socket Error $errno: $errstr");
+            return false;
         }
+
+        fwrite($handle, $keyword . "\r\n");
+        $contents = stream_get_contents($handle);
+        $closed = fclose($handle);
+
+        if ($closed === false) {
+            throw new Exception("Socket Error: unable to close connection");
+        }
+
+        return $contents;
     }
 
+    /**
+     * An array of ccSLDs.
+     *
+     * Also known as public suffixes. See the source list here:
+     * https://publicsuffix.org/list/public_suffix_list.dat
+     * This array was last updated on Feb-20-2018.
+     *
+     * @var array
+     */
     const CCSLD_ARRAY = array(
         "12hp.at",
         "2ix.at",
@@ -608,6 +674,11 @@ class Whois
         "zt.ua",
     );
 
+    /**
+     * An array WHOIS servers grouped by eTLDs.
+     *
+     * @var array
+     */
     const WHOIS_SERVERS = array(
         "ae.org"                   => "whois.centralnic.com",
         "africa.com"               => "whois.centralnic.com",
@@ -1695,6 +1766,11 @@ class Whois
         //"default"                => "whois.internic.net",
     );
 
+    /**
+     * An array of RIRs grouped by IPv4 octets.
+     *
+     * @var array
+     */
     const IPV4_REGISTRIES = array(
         "000" => "reserved",
         "001" => "whois.apnic.net",
@@ -1954,6 +2030,11 @@ class Whois
         "255" => "reserved",
     );
 
+    /**
+     * An array of RIRs grouped by IPv6 hextets.
+     *
+     * @var array
+     */
     const IPV6_REGISTRIES = array(
         "2001" => array(
             "0200" => "whois.apnic.net",
@@ -2001,3 +2082,4 @@ class Whois
         "5f00" => "reserved",
     );
 }
+
