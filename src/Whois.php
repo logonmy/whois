@@ -1,4 +1,16 @@
 <?php
+namespace michaelmawhinney;
+
+/**
+ * Whois can perform WHOIS queries on domain names and IP addresses.
+ *
+ * @category WHOIS
+ * @package Whois
+ * @author Michael R Mawhinney JR <michael.mawhinney.jr@gmail.com>
+ * @copyright 2018
+ * @license https://opensource.org/licenses/MIT/ MIT
+ * @version 0.8.0
+ */
 class Whois
 {
     public static function search($keyword)
