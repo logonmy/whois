@@ -61,7 +61,7 @@ class Whois
         if ($handle === false) {
             die("Socket Error $errno: $errstr");
         } else {
-            fwrite($handle, $keyword.PHP_EOL);
+            fwrite($handle, $keyword . "\r\n");
             $contents = stream_get_contents($handle);
             fclose($handle);
             return $contents;
