@@ -14,6 +14,12 @@ class Whois
 
     public static function root($domain)
     {
+        $result = self::etld($domain);
+        return $result["root"];
+    }
+
+    private static function etld($domain)
+    {
         $d = explode(".", $domain);
         $sld = implode(".", array_slice($d, -2, 2));
         $ccsld_array = file("includes/ccsld.txt", FILE_IGNORE_NEW_LINES);
@@ -21,28 +27,35 @@ class Whois
         // first search for a matching country-coded SLD
         // if no match, then assume a generic TLD
         if (in_array($sld, $ccsld_array)) {
-            return implode(".", array_slice($d, -3, 3));
+            return array(
+                "root" => implode(".", array_slice($d, -3, 3)),
+                "etld" => implode(".", array_slice($d, -2, 2)),
+                "tld" => end($d)
+            );
         } else {
-            return implode(".", array_slice($d, -2, 2));
+            return array(
+                "root" => implode(".", array_slice($d, -2, 2)),
+                "etld" => end($d),
+                "tld" => end($d)
+            );
         }
     }
 
     private static function searchDomain($domain)
     {
-        $d = explode(".", $domain);
-        $tld = end($d);
-        $root = implode(".", array_slice($d, -2, 2));
+        $result = self::etld($domain);
+        $root = $result["root"];
+        $etld = $result["etld"];
+        $tld = $result["tld"];
 
-        if (!array_key_exists($tld, self::WHOIS_SERVERS)) {
-            $tld = implode(".", array_slice($d, -2, 2));
-            $root = implode(".", array_slice($d, -3, 3));
-        }
-
-        if (!array_key_exists($tld, self::WHOIS_SERVERS)) {
+        if (array_key_exists($etld, self::WHOIS_SERVERS)) {
+            $whois_server = self::WHOIS_SERVERS[$etld];
+        } else if (array_key_exists($tld, self::WHOIS_SERVERS)) {
+            $whois_server = self::WHOIS_SERVERS[$tld];
+        } else {
             die("Error: no WHOIS server found");
         }
 
-        $whois_server = self::WHOIS_SERVERS[$tld];
         $result = self::query($whois_server, $root);
         if ($result === false) {
             die("Error: no entry for $root on $whois_server");
