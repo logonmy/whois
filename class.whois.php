@@ -1,25 +1,60 @@
 <?php
 class Whois
 {
-    public static function searchDomain($domain)
+    public static function search($keyword)
+    {
+        if (filter_var($keyword, FILTER_VALIDATE_IP) !== false) {
+            return self::searchIp($keyword);
+        } else if (filter_var($keyword, FILTER_VALIDATE_DOMAIN) !== false) {
+            return self::searchDomain($keyword);
+        } else {
+            die("Error: invalid WHOIS search keyword");
+        }
+    }
+
+    private static function searchDomain($domain)
     {
         $d = explode(".", $domain);
         $tld = end($d);
         $root = implode(".", array_slice($d, -2, 2));
+
         if (!array_key_exists($tld, self::WHOIS_SERVERS)) {
             $tld = implode(".", array_slice($d, -2, 2));
             $root = implode(".", array_slice($d, -3, 3));
         }
+
         if (!array_key_exists($tld, self::WHOIS_SERVERS)) {
             die("Error: no WHOIS server found");
         }
+
         $whois_server = self::WHOIS_SERVERS[$tld];
         $result = self::query($whois_server, $root);
         if ($result === false) {
             die("Error: no entry for $root on $whois_server");
         }
+
         return $result;
     }
+
+    private static function searchIp($ip)
+    {
+        /*
+            whois.arin.net (US, Canada)
+            whois.ripe.net (Europe, Russia, Central Asia)
+            whois.apnic.net (East Asia, Australia)
+            whois.lacnic.net (Latin America -- but searches globally)
+            whois.afrinic.net (Africa)
+            whois.iana.org (fallback)
+        */
+
+        // whois.lacnic.net accepts IPv4/6 and searches all of the RIRs
+        $result = self::query("whois.lacnic.net", $ip);
+        if ($result === false) {
+            die("Error: no entry found for $ip");
+        }
+        return $result;
+    }
+
     private static function query($server, $keyword)
     {
         $handle = fsockopen($server, 43, $errno, $errstr, 10);
@@ -32,6 +67,7 @@ class Whois
             return $contents;
         }
     }
+
     // private const is only available in PHP 7.1+
     // private const WHOIS_SERVERS = array(
     const WHOIS_SERVERS = array(
