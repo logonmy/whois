@@ -9,7 +9,7 @@ namespace michaelmawhinney;
  * @author Michael R Mawhinney JR <michael.mawhinney.jr@gmail.com>
  * @copyright 2018
  * @license https://opensource.org/licenses/MIT/ MIT
- * @version 0.9.0
+ * @version 0.10.0
  */
 class Whois
 {

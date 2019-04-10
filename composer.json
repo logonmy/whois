@@ -1,0 +1,23 @@
+{
+    "name": "michaelmawhinney/whois",
+    "description": "A PHP class that can perform WHOIS queries on domain names and IP addresses",
+    "keywords": ["WHOIS", "domain name", "IPv4", "IPv6", "IP address"],
+    "homepage": "https://github.com/michaelmawhinney/whois",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Michael R Mawhinney Jr",
+            "email": "michael.mawhinney.jr@gmail.com",
+            "homepage": "https://michaelmawhinney.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": ">=5.2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "michaelmawhinney\\": "src/"
+        }
+    }
+}
